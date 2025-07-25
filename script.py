@@ -711,7 +711,7 @@ class PowerPointGenerator:
             # Check available disk space (basic check)
             if hasattr(os, 'statvfs'):  # Unix systems
                 stat = os.statvfs(output_path.parent)
-                available_space = stat.f_frsize * stat.f_available
+                available_space = stat.f_frsize * stat.f_bavail
                 if available_space < 10 * 1024 * 1024:  # Less than 10MB
                     raise IOError("Insufficient disk space")
 
