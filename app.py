@@ -312,6 +312,8 @@ def main():
         st.session_state['full_markdown'] = None
     if 'last_core_skill' not in st.session_state:
         st.session_state['last_core_skill'] = None
+    if 'question_excel_buffer' not in st.session_state:
+        st.session_state['question_excel_buffer'] = None
 
     if generate_btn and is_valid:
         # Progress tracking
@@ -358,6 +360,7 @@ def main():
                     df, error = generate_question_paper(microskills_text, query_openai, api_key)
                     if error:
                         st.error(f"❌ {error}")
+                        st.session_state['question_excel_buffer'] = None
                     else:
                         st.success("✅ Question paper generated successfully!")
                         excel_buffer = io.BytesIO()
@@ -368,14 +371,8 @@ def main():
                             wrap_format = workbook.add_format({'text_wrap': True})
                             worksheet.set_column('A:Z', 25, wrap_format)
                         excel_buffer.seek(0)
-            
-                        st.download_button(
-                            label="📥 Download Question Paper (Excel)",
-                            data=excel_buffer,
-                            file_name=f"{core_skill.replace(' ', '_')}_questions.xlsx",
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                        )
-            
+                        st.session_state['question_excel_buffer'] = excel_buffer.getvalue()
+                        st.session_state['last_core_skill'] = core_skill
                         with st.expander("📋 Preview Question Table"):
                             st.dataframe(df)
 
@@ -385,38 +382,56 @@ def main():
             progress_bar.empty()
             status_text.empty()
 
-    # --- Show download buttons if files are available in session_state ---
-    if st.session_state.get('ppt_buffer') and st.session_state.get('notes_content') and st.session_state.get('full_markdown'):
-        col1, col2, col3 = st.columns(3)
-        core_skill_for_file = st.session_state.get('last_core_skill', 'presentation')
-        with col1:
-            st.download_button(
-                label="📄 Download PowerPoint",
-                data=st.session_state['ppt_buffer'],
-                file_name=f"{core_skill_for_file.replace(' ', '_')}_training.pptx",
-                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
-            )
-        with col2:
-            st.download_button(
-                label="📝 Download Speaker Notes",
-                data=st.session_state['notes_content'],
-                file_name=f"{core_skill_for_file.replace(' ', '_')}_notes.txt",
-                mime="text/plain"
-            )
-        with col3:
-            st.download_button(
-                label="📋 Download Markdown",
-                data=st.session_state['full_markdown'],
-                file_name=f"{core_skill_for_file.replace(' ', '_')}_canvas.md",
-                mime="text/markdown"
-            )
 
-        # Show preview of generated content
-        with st.expander("🔍 Preview Generated Content"):
-            st.subheader("Generated Slides (Markdown)")
-            st.code(st.session_state['full_markdown'][:2000] + "..." if len(st.session_state['full_markdown']) > 2000 else st.session_state['full_markdown'], language="markdown")
-            st.subheader("Speaker Notes Preview")
-            st.text(st.session_state['notes_content'][:1000] + "..." if len(st.session_state['notes_content']) > 1000 else st.session_state['notes_content'])
+    # --- Show download buttons if files are available in session_state ---
+    any_download = (
+        st.session_state.get('ppt_buffer') and st.session_state.get('notes_content') and st.session_state.get('full_markdown')
+    ) or st.session_state.get('question_excel_buffer')
+    if any_download:
+        cols = st.columns(4)
+        core_skill_for_file = st.session_state.get('last_core_skill', 'presentation')
+        col_idx = 0
+        if st.session_state.get('ppt_buffer') and st.session_state.get('notes_content') and st.session_state.get('full_markdown'):
+            with cols[col_idx]:
+                st.download_button(
+                    label="📄 Download PowerPoint",
+                    data=st.session_state['ppt_buffer'],
+                    file_name=f"{core_skill_for_file.replace(' ', '_')}_training.pptx",
+                    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                )
+            col_idx += 1
+            with cols[col_idx]:
+                st.download_button(
+                    label="📝 Download Speaker Notes",
+                    data=st.session_state['notes_content'],
+                    file_name=f"{core_skill_for_file.replace(' ', '_')}_notes.txt",
+                    mime="text/plain"
+                )
+            col_idx += 1
+            with cols[col_idx]:
+                st.download_button(
+                    label="📋 Download Markdown",
+                    data=st.session_state['full_markdown'],
+                    file_name=f"{core_skill_for_file.replace(' ', '_')}_canvas.md",
+                    mime="text/markdown"
+                )
+            col_idx += 1
+        if st.session_state.get('question_excel_buffer'):
+            with cols[col_idx]:
+                st.download_button(
+                    label="📥 Download Question Paper (Excel)",
+                    data=st.session_state['question_excel_buffer'],
+                    file_name=f"{core_skill_for_file.replace(' ', '_')}_questions.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+
+        # Show preview of generated content (if available)
+        if st.session_state.get('full_markdown'):
+            with st.expander("🔍 Preview Generated Content"):
+                st.subheader("Generated Slides (Markdown)")
+                st.code(st.session_state['full_markdown'][:2000] + "..." if len(st.session_state['full_markdown']) > 2000 else st.session_state['full_markdown'], language="markdown")
+                st.subheader("Speaker Notes Preview")
+                st.text(st.session_state['notes_content'][:1000] + "..." if len(st.session_state['notes_content']) > 1000 else st.session_state['notes_content'])
 
     # Footer
     st.markdown("---")
